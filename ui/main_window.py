@@ -24,6 +24,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from database.database import init_database, save_stats
+
 
 def _format_bytes_per_sec(bytes_per_sec: float) -> str:
     """Convert a bytes-per-second value to a human-readable string."""
@@ -109,10 +111,26 @@ class MainWindow(QMainWindow):
         self._net_initialised: bool = False
 
         # ------------------------------------------------------------------
-        # Timer
+        # Timer (UI refresh, 1 second)
         # ------------------------------------------------------------------
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._update_metrics)
+
+        # ------------------------------------------------------------------
+        # Timer (DB persistence, 10 seconds)
+        # ------------------------------------------------------------------
+        init_database()
+
+        self._db_timer = QTimer(self)
+        self._db_timer.setInterval(10_000)  # 10 seconds
+        self._db_timer.timeout.connect(self._save_to_db)
+
+        # Latest metric values (refreshed every 1 s, persisted every 10 s)
+        self._latest_cpu: float = 0.0
+        self._latest_mem: float = 0.0
+        self._latest_disk: float = 0.0
+        self._latest_upload: float = 0.0
+        self._latest_download: float = 0.0
 
         # ------------------------------------------------------------------
         # Build UI
@@ -204,12 +222,14 @@ class MainWindow(QMainWindow):
         """Begin periodic metric collection."""
         self._reset_network_state()
         self._timer.start(self._UPDATE_INTERVAL_MS)
+        self._db_timer.start()
         self._start_btn.setEnabled(False)
         self._stop_btn.setEnabled(True)
 
     def _stop_monitoring(self) -> None:
         """Stop periodic metric collection."""
         self._timer.stop()
+        self._db_timer.stop()
         self._start_btn.setEnabled(True)
         self._stop_btn.setEnabled(False)
 
@@ -234,12 +254,14 @@ class MainWindow(QMainWindow):
         #    last call to cpu_percent) --
         cpu = psutil.cpu_percent(interval=None)
         self._cpu_card.set_value(f"{cpu:.1f}%")
+        self._latest_cpu = cpu
 
         # -- Memory --
         mem = psutil.virtual_memory()
         used_str = _format_bytes(mem.used)
         total_str = _format_bytes(mem.total)
         self._mem_card.set_value(f"{mem.percent:.1f}%", f"{used_str} / {total_str}")
+        self._latest_mem = mem.percent
 
         # -- Disk --
         disk_total = 0
@@ -257,8 +279,11 @@ class MainWindow(QMainWindow):
         self._disk_card.set_value(
             f"{disk_percent:.1f}%", f"{used_disk_str} / {total_disk_str}"
         )
+        self._latest_disk = disk_percent
 
         # -- Network speed (bytes/sec, computed from deltas) --
+        upload_speed = 0.0
+        download_speed = 0.0
         net = psutil.net_io_counters()
         if self._net_initialised and self._prev_net_time > 0:
             elapsed = now - self._prev_net_time
@@ -272,6 +297,19 @@ class MainWindow(QMainWindow):
         else:
             self._net_initialised = True
 
+        self._latest_upload = upload_speed
+        self._latest_download = download_speed
+
         self._prev_net_bytes_sent = net.bytes_sent
         self._prev_net_bytes_recv = net.bytes_recv
         self._prev_net_time = now
+
+    def _save_to_db(self) -> None:
+        """Persist the latest metric values to the SQLite database."""
+        save_stats(
+            cpu_percent=self._latest_cpu,
+            memory_percent=self._latest_mem,
+            disk_percent=self._latest_disk,
+            upload_speed=self._latest_upload,
+            download_speed=self._latest_download,
+        )
