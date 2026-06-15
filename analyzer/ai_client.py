@@ -9,12 +9,12 @@ and optimization recommendations.
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from openai import OpenAI
 
 from analyzer.ai_analyzer import SystemStatus, analyze
+from config import get_api_key
 
 # ------------------------------------------------------------------
 # DeepSeek API configuration
@@ -107,13 +107,13 @@ def get_ai_analysis(
     user_prompt = _build_prompt(local)
 
     # 3. Call DeepSeek
-    key = api_key or os.getenv("DEEPSEEK_API_KEY")
+    key = api_key or get_api_key()
     if not key:
         return {
             "ok": False,
             "local_analysis": local.to_dict(),
             "ai_report": None,
-            "error": "未设置 DEEPSEEK_API_KEY 环境变量，无法调用 AI 分析",
+            "error": "未配置 DeepSeek API Key，请在设置中输入您的 API Key",
         }
 
     try:

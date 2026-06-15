@@ -16,8 +16,11 @@ from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
+    QLineEdit,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QTextEdit,
@@ -27,6 +30,7 @@ from PyQt6.QtWidgets import (
 
 from analyzer.ai_client import get_ai_analysis
 from charts.chart_widget import ChartWidget
+from config import get_api_key, set_api_key
 from database.database import init_database, save_stats
 
 
@@ -236,10 +240,15 @@ class MainWindow(QMainWindow):
         self._ai_btn.setMinimumHeight(40)
         self._ai_btn.clicked.connect(self._run_ai_analysis)
 
+        self._settings_btn = QPushButton("设置")
+        self._settings_btn.setMinimumHeight(40)
+        self._settings_btn.clicked.connect(self._open_settings)
+
         btn_layout.addStretch()
         btn_layout.addWidget(self._start_btn)
         btn_layout.addWidget(self._stop_btn)
         btn_layout.addWidget(self._ai_btn)
+        btn_layout.addWidget(self._settings_btn)
         btn_layout.addStretch()
 
         root.addLayout(btn_layout)
@@ -345,8 +354,43 @@ class MainWindow(QMainWindow):
         )
         self._chart.refresh()
 
+    def _open_settings(self) -> None:
+        """Open a dialog for configuring the DeepSeek API key."""
+        current_key = get_api_key() or ""
+
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle("设置 DeepSeek API Key")
+        dialog.setLabelText("请输入您的 DeepSeek API Key：\n"
+                           "（可在 https://platform.deepseek.com 获取）")
+        dialog.setTextValue(current_key)
+        dialog.setTextEchoMode(QLineEdit.EchoMode.Password)
+        # Use a wider input field
+        dialog.setMinimumWidth(480)
+
+        if dialog.exec() == QInputDialog.DialogCode.Accepted:
+            new_key = dialog.textValue().strip()
+            if new_key:
+                set_api_key(new_key)
+                QMessageBox.information(self, "设置成功",
+                    "API Key 已保存。\n\n"
+                    "Key 存储在 ~/.macsystemmonitor/config.json 中，\n"
+                    "Finder 启动也能正常使用 AI 分析。")
+            else:
+                QMessageBox.warning(self, "输入为空",
+                    "未输入 API Key，AI 分析功能将不可用。")
+
     def _run_ai_analysis(self) -> None:
         """Send recent monitoring data to DeepSeek and display the report."""
+        # Check if API key is configured
+        if not get_api_key():
+            self._ai_output.setMarkdown(
+                "## 未配置 API Key\n\n"
+                "请点击右下角「**设置**」按钮，输入您的 DeepSeek API Key。\n\n"
+                "获取方式：访问 [platform.deepseek.com](https://platform.deepseek.com) "
+                "注册并创建 API Key。"
+            )
+            return
+
         self._ai_btn.setEnabled(False)
         self._ai_output.setMarkdown("*正在调用 DeepSeek 进行分析…*")
 
