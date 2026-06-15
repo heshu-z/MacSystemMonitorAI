@@ -6,8 +6,9 @@ import os
 from contextlib import contextmanager
 from typing import Any
 
-# Default database path relative to project root
-_DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+# Database stored in macOS Application Support directory.
+# Works in both development mode and PyInstaller-bundled mode.
+_DB_DIR = os.path.join(os.path.expanduser("~"), "Library", "Application Support", "MacSystemMonitorAI")
 _DB_PATH = os.path.join(_DB_DIR, "monitor.db")
 
 
