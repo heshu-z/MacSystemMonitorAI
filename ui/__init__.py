@@ -2,4 +2,6 @@
 UI module - PyQt6-based graphical user interface.
 """
 
-__all__: list[str] = []
+from ui.main_window import MainWindow
+
+__all__: list[str] = ["MainWindow"]
