@@ -20,10 +20,12 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QSizePolicy,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
+from analyzer.ai_client import get_ai_analysis
 from charts.chart_widget import ChartWidget
 from database.database import init_database, save_stats
 
@@ -97,7 +99,7 @@ class MainWindow(QMainWindow):
     """Main application window for the system monitor."""
 
     _WINDOW_TITLE = "MacSystemMonitorAI"
-    _WINDOW_SIZE = (900, 720)
+    _WINDOW_SIZE = (900, 900)
     _UPDATE_INTERVAL_MS = 1000  # 1 second refresh
 
     def __init__(self) -> None:
@@ -137,6 +139,14 @@ class MainWindow(QMainWindow):
         # History chart
         # ------------------------------------------------------------------
         self._chart = ChartWidget(duration_minutes=10, parent=self)
+
+        # ------------------------------------------------------------------
+        # AI analysis output
+        # ------------------------------------------------------------------
+        self._ai_output = QTextEdit()
+        self._ai_output.setReadOnly(True)
+        self._ai_output.setPlaceholderText("点击「AI 分析」按钮，获取 DeepSeek 智能分析报告…")
+        self._ai_output.setMinimumHeight(150)
 
         # ------------------------------------------------------------------
         # Build UI
@@ -206,6 +216,9 @@ class MainWindow(QMainWindow):
         # --- History chart ---
         root.addWidget(self._chart, stretch=2)
 
+        # --- AI analysis output ---
+        root.addWidget(self._ai_output, stretch=1)
+
         # --- Bottom buttons ---
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(16)
@@ -219,9 +232,14 @@ class MainWindow(QMainWindow):
         self._stop_btn.setEnabled(False)
         self._stop_btn.clicked.connect(self._stop_monitoring)
 
+        self._ai_btn = QPushButton("AI 分析")
+        self._ai_btn.setMinimumHeight(40)
+        self._ai_btn.clicked.connect(self._run_ai_analysis)
+
         btn_layout.addStretch()
         btn_layout.addWidget(self._start_btn)
         btn_layout.addWidget(self._stop_btn)
+        btn_layout.addWidget(self._ai_btn)
         btn_layout.addStretch()
 
         root.addLayout(btn_layout)
@@ -326,3 +344,26 @@ class MainWindow(QMainWindow):
             download_speed=self._latest_download,
         )
         self._chart.refresh()
+
+    def _run_ai_analysis(self) -> None:
+        """Send recent monitoring data to DeepSeek and display the report."""
+        self._ai_btn.setEnabled(False)
+        self._ai_output.setMarkdown("*正在调用 DeepSeek 进行分析…*")
+
+        try:
+            result = get_ai_analysis(duration_minutes=30)
+        except Exception as exc:
+            self._ai_output.setMarkdown(
+                f"## 分析失败\n\n调用 AI 分析时发生异常：\n```\n{exc}\n```"
+            )
+            self._ai_btn.setEnabled(True)
+            return
+
+        if result["ok"] and result["ai_report"]:
+            self._ai_output.setMarkdown(result["ai_report"])
+        else:
+            self._ai_output.setMarkdown(
+                f"## 分析失败\n\n{result.get('error', '未知错误')}"
+            )
+
+        self._ai_btn.setEnabled(True)
