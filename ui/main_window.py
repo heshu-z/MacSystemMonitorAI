@@ -294,20 +294,20 @@ class MainWindow(QMainWindow):
         self._latest_mem = mem.percent
 
         # -- Disk --
-        disk_total = 0
-        disk_used = 0
-        for part in psutil.disk_partitions():
-            try:
-                usage = psutil.disk_usage(part.mountpoint)
-                disk_total += usage.total
-                disk_used += usage.used
-            except PermissionError:
-                continue
-        disk_percent = (disk_used / disk_total * 100) if disk_total > 0 else 0.0
-        used_disk_str = _format_bytes(disk_used)
-        total_disk_str = _format_bytes(disk_total)
+        # On macOS with APFS, multiple volumes share the same container,
+        # so summing partitions would inflate the total. Use `/` directly
+        # — it reports the correct APFS container totals on macOS.
+        try:
+            disk = psutil.disk_usage("/")
+            disk_total = disk.total
+            disk_used = disk.used
+            disk_percent = disk.percent
+        except PermissionError:
+            disk_total = disk_used = 0
+            disk_percent = 0.0
         self._disk_card.set_value(
-            f"{disk_percent:.1f}%", f"{used_disk_str} / {total_disk_str}"
+            f"{disk_percent:.1f}%",
+            f"{_format_bytes(disk_used)} / {_format_bytes(disk_total)}",
         )
         self._latest_disk = disk_percent
 

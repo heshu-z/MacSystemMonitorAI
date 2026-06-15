@@ -71,17 +71,11 @@ def get_disk_usage() -> dict:
                 - free (int)
                 - percent (float)
     """
-    total = 0
-    used = 0
-    free = 0
     partitions = []
 
     for part in psutil.disk_partitions():
         try:
             usage = psutil.disk_usage(part.mountpoint)
-            total += usage.total
-            used += usage.used
-            free += usage.free
             partitions.append({
                 "mountpoint": part.mountpoint,
                 "device": part.device,
@@ -94,7 +88,19 @@ def get_disk_usage() -> dict:
         except PermissionError:
             continue
 
-    percent = (used / total * 100) if total > 0 else 0.0
+    # On macOS with APFS, multiple volumes share the same container.
+    # Summing all partitions inflates total/used by 2-5×. Use `/`
+    # only for the summary — it correctly reports the APFS container
+    # totals on macOS.
+    try:
+        root_usage = psutil.disk_usage("/")
+        total = root_usage.total
+        used = root_usage.used
+        free = root_usage.free
+        percent = root_usage.percent
+    except PermissionError:
+        total = used = free = 0
+        percent = 0.0
 
     return {
         "total": total,
