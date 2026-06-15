@@ -123,6 +123,9 @@ class MainWindow(QMainWindow):
         # meaningful value instead of 0.0.
         psutil.cpu_percent(interval=None)
 
+        # Auto-start monitoring on launch
+        self._start_monitoring()
+
     # ------------------------------------------------------------------
     # UI construction
     # ------------------------------------------------------------------
