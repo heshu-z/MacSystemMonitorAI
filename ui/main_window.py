@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from charts.chart_widget import ChartWidget
 from database.database import init_database, save_stats
 
 
@@ -96,7 +97,7 @@ class MainWindow(QMainWindow):
     """Main application window for the system monitor."""
 
     _WINDOW_TITLE = "MacSystemMonitorAI"
-    _WINDOW_SIZE = (720, 520)
+    _WINDOW_SIZE = (900, 720)
     _UPDATE_INTERVAL_MS = 1000  # 1 second refresh
 
     def __init__(self) -> None:
@@ -133,6 +134,11 @@ class MainWindow(QMainWindow):
         self._latest_download: float = 0.0
 
         # ------------------------------------------------------------------
+        # History chart
+        # ------------------------------------------------------------------
+        self._chart = ChartWidget(duration_minutes=10, parent=self)
+
+        # ------------------------------------------------------------------
         # Build UI
         # ------------------------------------------------------------------
         self._setup_ui()
@@ -143,6 +149,9 @@ class MainWindow(QMainWindow):
 
         # Auto-start monitoring on launch
         self._start_monitoring()
+
+        # Initial chart draw (will show "等待数据…" until DB has rows)
+        self._chart.refresh()
 
     # ------------------------------------------------------------------
     # UI construction
@@ -193,6 +202,9 @@ class MainWindow(QMainWindow):
         grid.setColumnStretch(2, 1)
 
         root.addLayout(grid, stretch=1)
+
+        # --- History chart ---
+        root.addWidget(self._chart, stretch=2)
 
         # --- Bottom buttons ---
         btn_layout = QHBoxLayout()
@@ -313,3 +325,4 @@ class MainWindow(QMainWindow):
             upload_speed=self._latest_upload,
             download_speed=self._latest_download,
         )
+        self._chart.refresh()

@@ -2,4 +2,6 @@
 Charts module - matplotlib-based history trend visualization.
 """
 
-__all__: list[str] = []
+from charts.chart_widget import ChartWidget
+
+__all__ = ["ChartWidget"]
